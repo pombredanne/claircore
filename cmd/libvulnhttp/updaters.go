@@ -10,6 +10,7 @@ import (
 	"github.com/quay/claircore/libvuln/driver"
 	"github.com/quay/claircore/oracle"
 	"github.com/quay/claircore/rhel"
+	"github.com/quay/claircore/suse"
 	"github.com/quay/claircore/ubuntu"
 	"github.com/rs/zerolog/log"
 )
@@ -42,6 +43,23 @@ var amazonReleases = []aws.Release{
 	aws.Linux2,
 }
 
+var suseReleases = []suse.Release{
+	suse.Enterprise15,
+	suse.Enterprise12,
+	suse.EnterpriseServer15,
+	suse.EnterpriseServer12,
+	suse.EnterpriseServer11,
+	suse.EnterpriseDesktop15,
+	suse.EnterpriseDesktop12,
+	suse.EnterpriseDesktop11,
+	suse.Leap423,
+	suse.Leap150,
+	suse.Leap151,
+	suse.OpenStackCloud9,
+	suse.OpenStackCloud8,
+	suse.OpenStackCloud7,
+}
+
 func updaters() ([]driver.Updater, error) {
 	updaters := []driver.Updater{}
 	for _, rel := range ubuntuReleases {
@@ -69,6 +87,14 @@ func updaters() ([]driver.Updater, error) {
 		u, err := oracle.NewUpdater(year, oracle.WithLogger(&log.Logger))
 		if err != nil {
 			return nil, fmt.Errorf("unable to create oracle updater: %v", err)
+		}
+		updaters = append(updaters, u)
+	}
+
+	for _, rel := range suseReleases {
+		u, err := suse.NewUpdater(rel, suse.WithLogger(&log.Logger))
+		if err != nil {
+			return nil, fmt.Errorf("unable to create suse updater: %v", err)
 		}
 		updaters = append(updaters, u)
 	}
