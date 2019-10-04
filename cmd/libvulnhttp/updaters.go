@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/quay/claircore/aws"
 	"github.com/quay/claircore/debian"
@@ -64,9 +65,11 @@ func updaters() ([]driver.Updater, error) {
 		updaters = append(updaters, up)
 	}
 
-	if u, err := oracle.NewUpdater(oracle.WithLogger(&log.Logger)); err != nil {
-		return nil, fmt.Errorf("unable to create oracle updater: %v", err)
-	} else {
+	for year, lim := 2007, time.Now().Year(); year != lim; year++ {
+		u, err := oracle.NewUpdater(year, oracle.WithLogger(&log.Logger))
+		if err != nil {
+			return nil, fmt.Errorf("unable to create oracle updater: %v", err)
+		}
 		updaters = append(updaters, u)
 	}
 
