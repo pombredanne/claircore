@@ -23,7 +23,7 @@ const (
 
 const (
 	DefaultUpdateInterval         = 30 * time.Minute
-	DefaultUpdaterInitConcurrency = 5
+	DefaultUpdaterInitConcurrency = 10
 )
 
 type Opts struct {
