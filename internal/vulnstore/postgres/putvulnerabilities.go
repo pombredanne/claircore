@@ -2,8 +2,8 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
-	"time"
 
 	"github.com/quay/claircore"
 
@@ -90,6 +90,62 @@ func putVulnerabilities(ctx context.Context, pool *pgxpool.Pool, updater string,
 	// generate new tombstone
 	newTombstone := uuid.New().String()
 
+	// we will hash all fields we are about to insert for deduplication
+	seen := map[[32]byte]struct{}{}
+	rows := [][]interface{}{}
+	for _, vuln := range vulns {
+		if vuln.Package == nil {
+			vuln.Package = &claircore.Package{
+				Dist: &claircore.Distribution{},
+			}
+		}
+		if vuln.Package.Dist == nil {
+			vuln.Package.Dist = &claircore.Distribution{}
+		}
+
+		input := fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s",
+			updater,
+			vuln.Name,
+			vuln.Description,
+			vuln.Links,
+			vuln.Severity,
+			vuln.Package.Name,
+			vuln.Package.Version,
+			vuln.Package.Kind,
+			vuln.Package.Dist.DID,
+			vuln.Package.Dist.Name,
+			vuln.Package.Dist.Version,
+			vuln.Package.Dist.VersionCodeName,
+			vuln.Package.Dist.VersionID,
+			vuln.Package.Dist.Arch,
+			vuln.FixedInVersion,
+		)
+		h := sha256.Sum256([]byte(input))
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+
+		rows = append(rows, []interface{}{
+			updater,
+			vuln.Name,
+			vuln.Description,
+			vuln.Links,
+			vuln.Severity,
+			vuln.Package.Name,
+			vuln.Package.Version,
+			vuln.Package.Kind,
+			vuln.Package.Dist.DID,
+			vuln.Package.Dist.Name,
+			vuln.Package.Dist.Version,
+			vuln.Package.Dist.VersionCodeName,
+			vuln.Package.Dist.VersionID,
+			vuln.Package.Dist.Arch,
+			vuln.FixedInVersion,
+			newTombstone,
+		})
+	}
+
 	// start a transaction
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -97,61 +153,29 @@ func putVulnerabilities(ctx context.Context, pool *pgxpool.Pool, updater string,
 	}
 	defer tx.Rollback(ctx)
 
-	// begin batch insert
-	const flushSize = 100000
-	for i, rounds := 0, len(vulns)/flushSize; i <= rounds; i++ {
-		off := i * flushSize
-		lim := off + flushSize
-		var vs []*claircore.Vulnerability
-		if len(vulns) < lim {
-			vs = vulns[off:]
-		} else {
-			vs = vulns[off:lim]
-		}
-		batch := &pgx.Batch{}
-
-		for _, vuln := range vs {
-			if vuln.Package == nil {
-				vuln.Package = &claircore.Package{
-					Dist: &claircore.Distribution{},
-				}
-			}
-			if vuln.Package.Dist == nil {
-				vuln.Package.Dist = &claircore.Distribution{}
-			}
-			// queue the insert
-			batch.Queue(insertVulnerability,
-				updater,
-				vuln.Name,
-				vuln.Description,
-				vuln.Links,
-				vuln.Severity,
-				vuln.Package.Name,
-				vuln.Package.Version,
-				vuln.Package.Kind,
-				vuln.Package.Dist.DID,
-				vuln.Package.Dist.Name,
-				vuln.Package.Dist.Version,
-				vuln.Package.Dist.VersionCodeName,
-				vuln.Package.Dist.VersionID,
-				vuln.Package.Dist.Arch,
-				vuln.FixedInVersion,
-				newTombstone,
-			)
-		}
-
-		// Allow up to 30 seconds for SendBatch() to complete.
-		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		res := tx.SendBatch(tctx, batch)
-		for range vs {
-			if _, err := res.Exec(); err != nil {
-				cancel()
-				res.Close()
-				return fmt.Errorf("failed processing batch response: %v", err)
-			}
-		}
-		cancel()
-		res.Close()
+	_, err = tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"vuln"},
+		[]string{"updater",
+			"name",
+			"description",
+			"links",
+			"severity",
+			"package_name",
+			"package_version",
+			"package_kind",
+			"dist_id",
+			"dist_name",
+			"dist_version",
+			"dist_version_code_name",
+			"dist_version_id",
+			"arch",
+			"fixed_in_version",
+			"tombstone"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to use copy api: %v", err)
 	}
 
 	// delete any stale records. if oldTombstone is emptry string this indicates it's
@@ -174,3 +198,108 @@ func putVulnerabilities(ctx context.Context, pool *pgxpool.Pool, updater string,
 	}
 	return nil
 }
+
+// // putVulnerabilities will begin indexing the list of vulns into the database. a unique constraint
+// // is placed on this table to ensure deduplication. each new vulnerability is written with a new tombstone
+// // and each existing vulnerability has their tombstone updated. finally we delete all records with the
+// // told tombstone as they can be considered stale.
+// func putVulnerabilities(ctx context.Context, pool *pgxpool.Pool, updater string, hash string, vulns []*claircore.Vulnerability) error {
+// 	// get old tombstone
+// 	var oldTombstone string
+// 	row := pool.QueryRow(ctx, selectTombstone, updater)
+// 	err := row.Scan(&oldTombstone)
+// 	if err != nil {
+// 		if err == pgx.ErrNoRows {
+// 			oldTombstone = ""
+// 		} else {
+// 			return fmt.Errorf("failed to retrieve current tombstone: %v", err)
+// 		}
+// 	}
+
+// 	// generate new tombstone
+// 	newTombstone := uuid.New().String()
+
+// 	// start a transaction
+// 	tx, err := pool.Begin(ctx)
+// 	if err != nil {
+// 		return fmt.Errorf("unable to start transaction: %v", err)
+// 	}
+// 	defer tx.Rollback(ctx)
+
+// 	// begin batch insert
+// 	const flushSize = 100000
+// 	for i, rounds := 0, len(vulns)/flushSize; i <= rounds; i++ {
+// 		off := i * flushSize
+// 		lim := off + flushSize
+// 		var vs []*claircore.Vulnerability
+// 		if len(vulns) < lim {
+// 			vs = vulns[off:]
+// 		} else {
+// 			vs = vulns[off:lim]
+// 		}
+// 		batch := &pgx.Batch{}
+
+// 		for _, vuln := range vs {
+// 			if vuln.Package == nil {
+// 				vuln.Package = &claircore.Package{
+// 					Dist: &claircore.Distribution{},
+// 				}
+// 			}
+// 			if vuln.Package.Dist == nil {
+// 				vuln.Package.Dist = &claircore.Distribution{}
+// 			}
+// 			// queue the insert
+// 			batch.Queue(insertVulnerability,
+// 				updater,
+// 				vuln.Name,
+// 				vuln.Description,
+// 				vuln.Links,
+// 				vuln.Severity,
+// 				vuln.Package.Name,
+// 				vuln.Package.Version,
+// 				vuln.Package.Kind,
+// 				vuln.Package.Dist.DID,
+// 				vuln.Package.Dist.Name,
+// 				vuln.Package.Dist.Version,
+// 				vuln.Package.Dist.VersionCodeName,
+// 				vuln.Package.Dist.VersionID,
+// 				vuln.Package.Dist.Arch,
+// 				vuln.FixedInVersion,
+// 				newTombstone,
+// 			)
+// 		}
+
+// 		// Allow up to 30 seconds for SendBatch() to complete.
+// 		tctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// 		res := tx.SendBatch(tctx, batch)
+// 		for range vs {
+// 			if _, err := res.Exec(); err != nil {
+// 				cancel()
+// 				res.Close()
+// 				return fmt.Errorf("failed processing batch response: %v", err)
+// 			}
+// 		}
+// 		cancel()
+// 		res.Close()
+// 	}
+
+// 	// delete any stale records. if oldTombstone is emptry string this indicates it's
+// 	// our first update and nothiing to delete
+// 	if oldTombstone != "" {
+// 		_, err := tx.Exec(ctx, deleteTombstonedVulns, oldTombstone)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to remove tombstoned records. tx rollback: %v", err)
+// 		}
+// 	}
+
+// 	// upsert new updatecursor
+// 	_, err = tx.Exec(ctx, upsertUpdateCurosr, updater, hash, newTombstone)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to update updatecursor. tx rollback: %v", err)
+// 	}
+
+// 	if err := tx.Commit(ctx); err != nil {
+// 		return fmt.Errorf("failed to commit transaction: %v", err)
+// 	}
+// 	return nil
+// }
