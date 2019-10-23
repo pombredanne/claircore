@@ -60,15 +60,7 @@ func New(ctx context.Context, opts *Opts) (Libscan, error) {
 	}
 
 	// register any new scanners.
-	var pscnrs scanner.VersionedScanners
-	pscnrs.PStoVS(opts.PackageScannerFactory())
-
-	var dscnrs scanner.VersionedScanners
-	dscnrs.DStoVS(opts.DistributionScannerFactory())
-
-	var rscnrs scanner.VersionedScanners
-	rscnrs.RStoVS(opts.RepositoryScannerFactory())
-
+	pscnrs, dscnrs, rscnrs, err := scanner.EcosystemsToScanners(ctx, opts.Ecosystems)
 	vscnrs := scanner.MergeVS(pscnrs, dscnrs, rscnrs)
 
 	err = l.store.RegisterScanners(ctx, vscnrs)

@@ -3,7 +3,6 @@ package libscan
 import (
 	"fmt"
 
-	"github.com/quay/claircore/dpkg"
 	"github.com/quay/claircore/internal/scanner"
 	"github.com/quay/claircore/internal/scanner/defaultfetcher"
 	"github.com/quay/claircore/internal/scanner/defaultlayerscanner"
@@ -32,43 +31,15 @@ func scannerFactory(lib *libscan, opts *Opts) (scanner.Scanner, error) {
 
 	// convert libscan.Opts to scanner.Opts
 	sOpts := &scanner.Opts{
-		Store:                lib.store,
-		ScanLock:             sc,
-		Fetcher:              ft,
-		PackageScanners:      opts.PackageScannerFactory(),
-		DistributionScanners: opts.DistributionScannerFactory(),
-		RepositoryScanners:   opts.RepositoryScannerFactory(),
-		// this private field is set during libscan construction
-		Vscnrs: lib.vscnrs,
+		Store:      lib.store,
+		ScanLock:   sc,
+		Fetcher:    ft,
+		Ecosystems: opts.Ecosystems,
+		Vscnrs:     lib.vscnrs,
 	}
 
 	// add other layer scanner implementations as they grow
 	sOpts.LayerScanner = defaultlayerscanner.New(opts.LayerScanConcurrency, sOpts)
 	s := defaultscanner.New(sOpts)
 	return s, nil
-}
-
-// PackageScannerFactory is a factory method to return a set of PackageScanners which are used during libscan runtime.
-type PackageScannerFactory func() []scanner.PackageScanner
-
-// packageScannerFactory is the default PackageScannerFactory
-func packageScannerFactory() []scanner.PackageScanner {
-	return []scanner.PackageScanner{
-		// add other packge scanners as they grow
-		&dpkg.Scanner{},
-	}
-}
-
-// DistributionScannerFactory is a factory method to return a set of DistributionScanners which are used during libscan runtime
-type DistributionScannerFactory func() []scanner.DistributionScanner
-
-func distributionScannerFactory() []scanner.DistributionScanner {
-	return []scanner.DistributionScanner{}
-}
-
-// RepositoryScannerFactory is a factory method to return a set of RepositoryScanners which are used during libscan runtime
-type RepositoryScannerFactory func() []scanner.RepositoryScanner
-
-func repositoryScannerFactory() []scanner.RepositoryScanner {
-	return []scanner.RepositoryScanner{}
 }

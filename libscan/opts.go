@@ -44,16 +44,9 @@ type Opts struct {
 	// provides an alternative method for creating a scanner during libscan runtime
 	// if nil the default factory will be used
 	ScannerFactory ScannerFactory
-	// provides an alternative method for specifying the package scanners used during libscan runtime
-	// if nil the default factory will be used
-	PackageScannerFactory PackageScannerFactory
-	// provides an alternative method for specifying the distribution scanners used during libscan runtime
-	// if nil the default factory will be used
-	DistributionScannerFactory DistributionScannerFactory
-	// provides an alternative method for specifying the repository scanners used during libscan runtime
-	// if nil the default factory will be used
-	RepositoryScannerFactory RepositoryScannerFactory
-	// Computed after libscan initialization
+	// a list of ecosystems to use which define which package databases and coalescing methods we use
+	Ecosystems []scanner.Ecosystem
+	// a convenience method for holding a list of versioned scanners
 	vscnrs scanner.VersionedScanners
 }
 
@@ -68,6 +61,9 @@ func (o *Opts) Parse() error {
 	if o.ScanLock == "" {
 		return fmt.Errorf("ScanLock not provided")
 	}
+	if len(o.Ecosystems) == 0 {
+		return fmt.Errorf("No ecosystems provided. cannot scan manifests")
+	}
 
 	// optional
 	if o.ScanLockRetry == 0 {
@@ -79,16 +75,6 @@ func (o *Opts) Parse() error {
 	if o.ScannerFactory == nil {
 		o.ScannerFactory = scannerFactory
 	}
-	if o.PackageScannerFactory == nil {
-		o.PackageScannerFactory = packageScannerFactory
-	}
-	if o.DistributionScannerFactory == nil {
-		o.DistributionScannerFactory = distributionScannerFactory
-	}
-	if o.RepositoryScannerFactory == nil {
-		o.RepositoryScannerFactory = repositoryScannerFactory
-	}
-
 	// for now force this to Tee to support layer stacking
 	o.LayerFetchOpt = DefaultLayerFetchOpt
 

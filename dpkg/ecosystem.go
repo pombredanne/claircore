@@ -10,11 +10,11 @@ import (
 // NewEcosystem provides the set of scanners and coalescers for the dpkg ecosystem
 func NewEcosystem(ctx context.Context) *scanner.Ecosystem {
 	return &scanner.Ecosystem{
-		PackageScanners: []scanner.PackageScannerFunc{
-			func(ctx context.Context) (scanner.PackageScanner, error) { return &Scanner{}, nil },
+		PackageScanners: func(ctx context.Context) ([]scanner.PackageScanner, error) {
+			return []scanner.PackageScanner{&Scanner{}}, nil
 		},
-		DistributionScanners: []scanner.DistributionScannerFunc{
-			func(ctx context.Context) (scanner.DistributionScanner, error) { return &osrelease.Scanner{}, nil },
+		DistributionScanners: func(ctx context.Context) ([]scanner.DistributionScanner, error) {
+			return []scanner.DistributionScanner{&osrelease.Scanner{}}, nil
 		},
 		Coalescer: func(ctx context.Context, store scanner.Store) (scanner.Coalescer, error) {
 			return NewCoalescer(store), nil
