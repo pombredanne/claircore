@@ -1,26 +1,24 @@
-package defaultscanner
+package controller
 
 import "encoding/json"
 
-// ScannerState is a specific state in the scanner fsm
-type ScannerState int
+// State is a specific state in the scanner fsm
+type State int
 
-func (ss ScannerState) String() string {
+func (ss State) String() string {
 	names := [...]string{
 		"Terminal",
 		"CheckManifest",
 		"FetchLayers",
 		"LayerScan",
 		"Coalesce",
-		// "BuildImageResult",
-		// "BuildLayerResults",
 		"ScanError",
 		"ScanFinished",
 	}
 	return names[ss]
 }
 
-func (ss *ScannerState) FromString(state string) {
+func (ss *State) FromString(state string) {
 	switch state {
 	case "Terminal":
 		*ss = Terminal
@@ -32,10 +30,6 @@ func (ss *ScannerState) FromString(state string) {
 		*ss = LayerScan
 	case "Coalesce":
 		*ss = Coalesce
-	// case "BuildImageResult":
-	// 	*ss = BuildImageResult
-	// case "BuildLayerResult":
-	// 	*ss = BuildLayerResult
 	case "ScanError":
 		*ss = ScanError
 	case "ScanFinished":
@@ -43,11 +37,11 @@ func (ss *ScannerState) FromString(state string) {
 	}
 }
 
-func (ss ScannerState) MarshalJSON() ([]byte, error) {
+func (ss State) MarshalJSON() ([]byte, error) {
 	return json.Marshal(ss.String())
 }
 
-func (ss *ScannerState) UnmarshalJSON(data []byte) error {
+func (ss *State) UnmarshalJSON(data []byte) error {
 	var temp string
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return err

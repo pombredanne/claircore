@@ -1,4 +1,4 @@
-package defaultscanner
+package controller
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/quay/claircore/internal/scanner"
 )
 
-func fetchLayers(ctx context.Context, s *defaultScanner) (ScannerState, error) {
+func fetchLayers(ctx context.Context, s *Controller) (State, error) {
 	toFetch := reduce(ctx, s.Store, s.Vscnrs, s.manifest.Layers)
 	err := s.Fetcher.Fetch(ctx, toFetch)
 	if err != nil {

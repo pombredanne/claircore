@@ -80,7 +80,7 @@ func (l *libscan) Scan(ctx context.Context, manifest *claircore.Manifest) (<-cha
 
 	rc := make(chan *claircore.ScanReport, 1)
 
-	s, err := l.ScannerFactory(l, l.Opts)
+	s, err := l.ControllerFactory(l, l.Opts)
 	if err != nil {
 		l.logger.Error().Msgf("scanner factory failed to construct a scanner: %v", err)
 		return nil, fmt.Errorf("scanner factory failed to construct a scanner: %v", err)

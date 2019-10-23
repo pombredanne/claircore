@@ -1,4 +1,4 @@
-package defaultlayerscanner
+package layerscanner
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 )
 
 // defaultLayerScanner implements the libscan.LayerScanner interface.
-type defaultLayerScanner struct {
+type layerScanner struct {
 	// common depedencies
 	*scanner.Opts
 	// concurrency level. maximum number of concurrent layer scans
@@ -27,14 +27,14 @@ type defaultLayerScanner struct {
 
 // New is a constructor for a defaultLayerScanner
 func New(cLevel int, opts *scanner.Opts) scanner.LayerScanner {
-	return &defaultLayerScanner{
+	return &layerScanner{
 		Opts:   opts,
 		cLevel: cLevel,
 	}
 }
 
 // Scan performs max cLevel concurrent scans of the provided layers.
-func (ls *defaultLayerScanner) Scan(ctx context.Context, manifest string, layers []*claircore.Layer) error {
+func (ls *layerScanner) Scan(ctx context.Context, manifest string, layers []*claircore.Layer) error {
 	// create concurrency control channel.
 	// if ls.LayerScanConcurrency is 0 bump to 1; pick min of both values
 	x := float64(len(layers))
@@ -76,33 +76,33 @@ func (ls *defaultLayerScanner) Scan(ctx context.Context, manifest string, layers
 	return nil
 }
 
-func (ls *defaultLayerScanner) scanPackages(ctx context.Context, layer *claircore.Layer) error {
-	for _, scnr := range ls.PackageScanners {
-		// confirm if we have scanned this layer with this scanner before
-		if ok, _ := ls.Store.LayerScanned(ctx, layer.Hash, scnr); ok {
-			ls.logger.Debug().Msgf("layer %s already scanned by %v", layer.Hash, scnr)
-			continue
-		}
+func (ls *layerScanner) scanPackages(ctx context.Context, layer *claircore.Layer) error {
+	// for _, scnr := range ls.PackageScanners {
+	// 	// confirm if we have scanned this layer with this scanner before
+	// 	if ok, _ := ls.Store.LayerScanned(ctx, layer.Hash, scnr); ok {
+	// 		ls.logger.Debug().Msgf("layer %s already scanned by %v", layer.Hash, scnr)
+	// 		continue
+	// 	}
 
-		// scan layer with current scanner
-		ls.logger.Debug().Msgf("scanning layer %s scr: %v", layer.Hash, scnr.Name())
-		pkgs, err := scnr.Scan(layer)
-		if err != nil {
-			ls.logger.Error().Msgf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
-			return fmt.Errorf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
-		}
+	// 	// scan layer with current scanner
+	// 	ls.logger.Debug().Msgf("scanning layer %s scr: %v", layer.Hash, scnr.Name())
+	// 	pkgs, err := scnr.Scan(layer)
+	// 	if err != nil {
+	// 		ls.logger.Error().Msgf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
+	// 		return fmt.Errorf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
+	// 	}
 
-		err = ls.Store.IndexPackages(ctx, pkgs, layer, scnr)
-		if err != nil {
-			ls.logger.Error().Msgf("failed to index packages for layer %v scr: %v: %v", layer.Hash, scnr, err)
-			return fmt.Errorf("failed to index packages for layer %v and scanner %v: %v", layer.Hash, scnr, err)
-		}
-	}
+	// 	err = ls.Store.IndexPackages(ctx, pkgs, layer, scnr)
+	// 	if err != nil {
+	// 		ls.logger.Error().Msgf("failed to index packages for layer %v scr: %v: %v", layer.Hash, scnr, err)
+	// 		return fmt.Errorf("failed to index packages for layer %v and scanner %v: %v", layer.Hash, scnr, err)
+	// 	}
+	// }
 	return nil
 }
 
 // addToken will block if concurrency limit is hit.
-func (ls *defaultLayerScanner) addToken(ctx context.Context) error {
+func (ls *layerScanner) addToken(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -112,6 +112,6 @@ func (ls *defaultLayerScanner) addToken(ctx context.Context) error {
 }
 
 // discardToken removes a token from the concurrency channel
-func (ls *defaultLayerScanner) discardToken() {
+func (ls *layerScanner) discardToken() {
 	<-ls.cc
 }

@@ -1,4 +1,4 @@
-package defaultscanner
+package controller
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 // coalesce calls each ecosystem's coalescer and merges the returned ScanReports
-func coalesce(ctx context.Context, s *defaultScanner) (ScannerState, error) {
+func coalesce(ctx context.Context, s *Controller) (State, error) {
 	coalescers := []scanner.Coalescer{}
 	for _, ecosystem := range s.Ecosystems {
 		c, err := ecosystem.Coalescer(ctx, s.Store)

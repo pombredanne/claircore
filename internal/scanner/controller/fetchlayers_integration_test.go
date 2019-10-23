@@ -1,6 +1,6 @@
 //+build unix
 
-package defaultscanner
+package controller
 
 import (
 	"context"

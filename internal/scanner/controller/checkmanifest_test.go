@@ -1,4 +1,4 @@
-package defaultscanner
+package controller
 
 import (
 	"context"

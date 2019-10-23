@@ -1,4 +1,4 @@
-package defaultscanner
+package controller
 
 // // buildLayerResult is a stateFunc which retrieves all the indexed packages for a layer
 // // limited by the supplied scanners and populates the result.PackageIntroduced map.

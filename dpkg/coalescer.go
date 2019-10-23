@@ -38,6 +38,7 @@ func NewCoalescer(store scanner.Store) *Coalescer {
 		ds:    &osrelease.Scanner{},
 		rs:    nil,
 		sr: &claircore.ScanReport{
+			// we will only fill these fields
 			PackageIntroduced:     map[int]string{},
 			Packages:              map[int]*claircore.Package{},
 			Distributions:         map[int]*claircore.Distribution{},
@@ -48,9 +49,9 @@ func NewCoalescer(store scanner.Store) *Coalescer {
 	}
 }
 
-// Do coalesces artifacts found in layers and creates a final ScanReport with
+// Coalesce coalesces artifacts found in layers and creates a final ScanReport with
 // the final package details found in the image. This method blocks and when its finished
-// the c.SR field will hold the final ScanReport
+// the c.sr field will hold the final ScanReport
 func (c *Coalescer) Coalesce(ctx context.Context, layers []*claircore.Layer) (*claircore.ScanReport, error) {
 	var err error
 	// populate layer artifacts

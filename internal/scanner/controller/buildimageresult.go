@@ -1,4 +1,4 @@
-package defaultscanner
+package controller
 
 // func buildImageResult(s *defaultScanner, ctx context.Context) (ScannerState, error) {
 // 	for _, scnr := range s.PackageScanners {

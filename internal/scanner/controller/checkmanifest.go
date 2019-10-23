@@ -1,11 +1,11 @@
-package defaultscanner
+package controller
 
 import (
 	"context"
 	"fmt"
 )
 
-func checkManifest(ctx context.Context, s *defaultScanner) (ScannerState, error) {
+func checkManifest(ctx context.Context, s *Controller) (State, error) {
 	// determine if we've seen this manifest and if we've
 	// scanned it with the desired scanners
 	ok, err := s.Store.ManifestScanned(ctx, s.manifest.Hash, s.Vscnrs)

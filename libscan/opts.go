@@ -42,8 +42,8 @@ type Opts struct {
 	// how we store layers we fetch remotely. see LayerFetchOpt type def above for more details
 	LayerFetchOpt scanner.LayerFetchOpt
 	// provides an alternative method for creating a scanner during libscan runtime
-	// if nil the default factory will be used
-	ScannerFactory ScannerFactory
+	// if nil the default factory will be used. useful for testing purposes
+	ControllerFactory ControllerFactory
 	// a list of ecosystems to use which define which package databases and coalescing methods we use
 	Ecosystems []scanner.Ecosystem
 	// a convenience method for holding a list of versioned scanners
@@ -72,8 +72,8 @@ func (o *Opts) Parse() error {
 	if o.LayerScanConcurrency == 0 {
 		o.LayerScanConcurrency = DefaultLayerScanConcurrency
 	}
-	if o.ScannerFactory == nil {
-		o.ScannerFactory = scannerFactory
+	if o.ControllerFactory == nil {
+		o.ControllerFactory = controllerFactory
 	}
 	// for now force this to Tee to support layer stacking
 	o.LayerFetchOpt = DefaultLayerFetchOpt

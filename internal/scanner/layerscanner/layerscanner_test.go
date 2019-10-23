@@ -1,4 +1,4 @@
-package defaultlayerscanner
+package layerscanner
 
 import (
 	"context"
