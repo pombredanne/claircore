@@ -9,10 +9,11 @@ func (ss ScannerState) String() string {
 	names := [...]string{
 		"Terminal",
 		"CheckManifest",
-		"FetchAndStackLayers",
+		"FetchLayers",
 		"LayerScan",
-		"BuildImageResult",
-		"BuildLayerResults",
+		"Coalesce",
+		// "BuildImageResult",
+		// "BuildLayerResults",
 		"ScanError",
 		"ScanFinished",
 	}
@@ -25,14 +26,16 @@ func (ss *ScannerState) FromString(state string) {
 		*ss = Terminal
 	case "CheckManifest":
 		*ss = CheckManifest
-	case "FetchAndStackLayers":
-		*ss = FetchAndStackLayers
+	case "FetchLayers":
+		*ss = FetchLayers
 	case "LayerScan":
 		*ss = LayerScan
-	case "BuildImageResult":
-		*ss = BuildImageResult
-	case "BuildLayerResult":
-		*ss = BuildLayerResult
+	case "Coalesce":
+		*ss = Coalesce
+	// case "BuildImageResult":
+	// 	*ss = BuildImageResult
+	// case "BuildLayerResult":
+	// 	*ss = BuildLayerResult
 	case "ScanError":
 		*ss = ScanError
 	case "ScanFinished":

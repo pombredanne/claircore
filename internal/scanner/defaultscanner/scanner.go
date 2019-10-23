@@ -13,7 +13,8 @@ import (
 // stateFunc implement the logic of our scanner and map directly to ScannerStates.
 // returnin an error will exit the scanner in an error state.
 // returning Terminal ends the scanner in a non error state.
-type stateFunc func(*defaultScanner, context.Context) (ScannerState, error)
+// type stateFunc func(*defaultScanner, context.Context) (ScannerState, error)
+type stateFunc func(context.Context, *defaultScanner) (ScannerState, error)
 
 // States and their explanations.
 // each state is implemented by a stateFunc implemented in their own files.
@@ -27,16 +28,21 @@ const (
 	// FetchAndStackLayers retrieves all the layers in a manifest and stacks them the same obtain the file image contents.
 	// creates the "image" layer
 	// Transitions: LayerScan
-	FetchAndStackLayers
+	FetchLayers
 	// LayerScan scans each image including the image layer and indexes the contents
 	// Transitions: BuildLayerResult
 	LayerScan
-	// BuildImageResult inventories the discovered packages in the image layer
-	// Transitions BuildLayerResult
-	BuildImageResult
-	// BuildLayerResult finds the layer a package was introduced in
-	// Transitions: ScanError
-	BuildLayerResult
+	// Coalesce runs each provided ecosystem's coalescer and mergs their scan results
+	// Transitions: ScanFinished
+	Coalesce
+
+	// // BuildImageResult inventories the discovered packages in the image layer
+	// // Transitions BuildLayerResult
+	// BuildImageResult
+	// // BuildLayerResult finds the layer a package was introduced in
+	// // Transitions: ScanError
+	// BuildLayerResult
+
 	// ScanError state indicates a impassable error has occured.
 	// returns a ScanResult with the error field
 	// Transitions: Terminal
@@ -49,12 +55,13 @@ const (
 
 // provides a mapping of ScannerStates to their implemented stateFunc methods
 var stateToStateFunc = map[ScannerState]stateFunc{
-	CheckManifest:       checkManifest,
-	FetchAndStackLayers: fetchAndStackLayers,
-	LayerScan:           layerScan,
-	BuildImageResult:    buildImageResult,
-	BuildLayerResult:    buildLayerResult,
-	ScanFinished:        scanFinished,
+	CheckManifest: checkManifest,
+	FetchLayers:   fetchLayers,
+	LayerScan:     layerScan,
+	Coalesce:      coalesce,
+	// BuildImageResult: buildImageResult,
+	// BuildLayerResult: buildLayerResult,
+	ScanFinished: scanFinished,
 }
 
 // StartState is a global variable which is normally set to the starting state
@@ -128,7 +135,7 @@ func (s *defaultScanner) Scan(ctx context.Context, manifest *claircore.Manifest)
 // run executes each stateFunc and blocks until either an error occurs or
 // a Terminal state is encountered.
 func (s *defaultScanner) run(ctx context.Context) {
-	state, err := stateToStateFunc[s.getState()](s, ctx)
+	state, err := stateToStateFunc[s.getState()](ctx, s)
 	if err != nil {
 		s.handleError(ctx, err)
 		return

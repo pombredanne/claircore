@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func checkManifest(s *defaultScanner, ctx context.Context) (ScannerState, error) {
+func checkManifest(ctx context.Context, s *defaultScanner) (ScannerState, error) {
 	// determine if we've seen this manifest and if we've
 	// scanned it with the desired scanners
 	ok, err := s.Store.ManifestScanned(ctx, s.manifest.Hash, s.Vscnrs)
@@ -17,7 +17,7 @@ func checkManifest(s *defaultScanner, ctx context.Context) (ScannerState, error)
 	// if we haven't seen this manifest enter layer scanning state
 	if !ok {
 		s.logger.Info().Str("state", s.getState().String()).Msg("manifest will be scanned")
-		return FetchAndStackLayers, nil
+		return FetchLayers, nil
 	}
 
 	// we have seen this manifest before and it's been been processed with the desired scanners

@@ -9,7 +9,7 @@ import (
 
 // layerScan is a stateFunc which scans each individual layer using a layerScanner.
 // it returns the buildLayerResult stateFunc on success
-func layerScan(s *defaultScanner, ctx context.Context) (ScannerState, error) {
+func layerScan(ctx context.Context, s *defaultScanner) (ScannerState, error) {
 	// scan the individual container images. packages will be indexed associated
 	// with the individual layer's hash
 	s.logger.Debug().Str("state", s.getState().String()).Msg("scanning individual layers in manifest")
@@ -29,5 +29,5 @@ func layerScan(s *defaultScanner, ctx context.Context) (ScannerState, error) {
 	}
 
 	s.logger.Info().Str("state", s.getState().String()).Msg("done scanning layers")
-	return BuildImageResult, nil
+	return Coalesce, nil
 }
