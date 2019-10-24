@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_LayerScan(t *testing.T) {
+func Test_ScanLayers(t *testing.T) {
 	var tt = []struct {
 		name          string
 		expectedState ScannerState

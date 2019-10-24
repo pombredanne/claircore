@@ -6,6 +6,8 @@ import "context"
 //
 // A typical ecosystem is "DPKG" which will use the DPKG package scanner, the "OS-Release"
 // distribution scanner and the "APT" repository scanner.
+//
+// A Controller will scan layers with all scanners present in its configured ecosystems.
 type Ecosystem struct {
 	Name                 string
 	PackageScanners      func(ctx context.Context) ([]PackageScanner, error)

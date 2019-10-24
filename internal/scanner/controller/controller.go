@@ -29,9 +29,9 @@ const (
 	// creates the "image" layer
 	// Transitions: LayerScan
 	FetchLayers
-	// LayerScan scans each image including the image layer and indexes the contents
+	// ScanLayers scans each image including the image layer and indexes the contents
 	// Transitions: BuildLayerResult
-	LayerScan
+	ScanLayers
 	// Coalesce runs each provided ecosystem's coalescer and mergs their scan results
 	// Transitions: ScanFinished
 	Coalesce
@@ -49,7 +49,7 @@ const (
 var stateToStateFunc = map[State]stateFunc{
 	CheckManifest: checkManifest,
 	FetchLayers:   fetchLayers,
-	LayerScan:     layerScan,
+	ScanLayers:    scanLayers,
 	Coalesce:      coalesce,
 	ScanFinished:  scanFinished,
 }

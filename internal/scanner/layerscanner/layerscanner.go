@@ -7,13 +7,12 @@ import (
 
 	"github.com/quay/claircore"
 	"github.com/quay/claircore/internal/scanner"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/sync/errgroup"
 )
 
-// defaultLayerScanner implements the libscan.LayerScanner interface.
+// layerScanner implements the scanner.LayerScanner interface.
 type layerScanner struct {
 	// common depedencies
 	*scanner.Opts
@@ -33,75 +32,8 @@ func New(cLevel int, opts *scanner.Opts) scanner.LayerScanner {
 	}
 }
 
-// Scan performs max cLevel concurrent scans of the provided layers.
-func (ls *layerScanner) Scan(ctx context.Context, manifest string, layers []*claircore.Layer) error {
-	// create concurrency control channel.
-	// if ls.LayerScanConcurrency is 0 bump to 1; pick min of both values
-	x := float64(len(layers))
-	y := float64(ls.cLevel)
-	if y == 0 {
-		y++
-	}
-
-	ccMin := int(math.Min(x, y))
-	ls.cc = make(chan struct{}, ccMin)
-
-	// setup logger context
-	ls.logger = log.With().Str("component", "defaultLayerScanner").Str("manifest", manifest).Int("concurrency", ccMin).Logger()
-
-	ls.logger.Info().Msg("starting concurrent layer scan")
-	var g errgroup.Group
-	for _, l := range layers {
-		err := ls.addToken(ctx)
-		if err != nil {
-			return err
-		}
-
-		// make a copy of our layer point before providing to the go routine. we do not
-		// want to share the l variable as this will cause a data race
-		ll := l
-		g.Go(func() error {
-			// discarding a token allows another scan to occur if concurrency limit was reached
-			defer ls.discardToken()
-			// scan packages
-			err := ls.scanPackages(ctx, ll)
-			return err
-		})
-	}
-
-	// wait for any concurrent scans to finish
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("encountered error while scanning a layer: %v", err)
-	}
-	return nil
-}
-
-func (ls *layerScanner) scanPackages(ctx context.Context, layer *claircore.Layer) error {
-	// for _, scnr := range ls.PackageScanners {
-	// 	// confirm if we have scanned this layer with this scanner before
-	// 	if ok, _ := ls.Store.LayerScanned(ctx, layer.Hash, scnr); ok {
-	// 		ls.logger.Debug().Msgf("layer %s already scanned by %v", layer.Hash, scnr)
-	// 		continue
-	// 	}
-
-	// 	// scan layer with current scanner
-	// 	ls.logger.Debug().Msgf("scanning layer %s scr: %v", layer.Hash, scnr.Name())
-	// 	pkgs, err := scnr.Scan(layer)
-	// 	if err != nil {
-	// 		ls.logger.Error().Msgf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
-	// 		return fmt.Errorf("scr %v reported an error for layer %v: %v", scnr.Name(), layer.Hash, err)
-	// 	}
-
-	// 	err = ls.Store.IndexPackages(ctx, pkgs, layer, scnr)
-	// 	if err != nil {
-	// 		ls.logger.Error().Msgf("failed to index packages for layer %v scr: %v: %v", layer.Hash, scnr, err)
-	// 		return fmt.Errorf("failed to index packages for layer %v and scanner %v: %v", layer.Hash, scnr, err)
-	// 	}
-	// }
-	return nil
-}
-
-// addToken will block if concurrency limit is hit.
+// addToken will block until a spot in the conccurency channel is available
+// or the ctx is canceled.
 func (ls *layerScanner) addToken(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -111,7 +43,106 @@ func (ls *layerScanner) addToken(ctx context.Context) error {
 	}
 }
 
-// discardToken removes a token from the concurrency channel
+// discardToken is only called after addToken. Removes a token
+// from the concurrency channel allowing another task to kick off.
 func (ls *layerScanner) discardToken() {
-	<-ls.cc
+	select {
+	case <-ls.cc:
+	default:
+	}
+}
+
+// Scan performs a concurrency controlled scan of each layer by each type of configured scanner; indexing
+// the results on successful completion.
+//
+// Scan will launch all necessary go routines and each routine will block on adding a token.
+// On completion a token is discarded unblocking other routines which are waiting.
+//
+// On ctx cancel or a go routine reporting an scan/index error all routines blocking on adding a token will error
+// and the will not discard a token.
+//
+// Scan waits for all go routines to finish successfully before unblocking.
+func (ls *layerScanner) Scan(ctx context.Context, manifest string, layers []*claircore.Layer) error {
+	// compute concurrency level
+	x := float64(len(layers))
+	y := float64(ls.cLevel)
+	if y == 0 {
+		y++
+	}
+	ccMin := int(math.Min(x, y))
+
+	ls.cc = make(chan struct{}, ccMin)
+
+	ps, ds, rs, err := scanner.EcosystemsToScanners(ctx, ls.Opts.Ecosystems)
+	if err != nil {
+		fmt.Errorf("failed to extract scanners from ecosystems: %v", err)
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	for _, layer := range layers {
+		ll := layer
+
+		for _, s := range ps {
+			g.Go(func() error {
+				return ls.scanPackages(gctx, ll, s)
+			})
+		}
+
+		for _, s := range ds {
+			g.Go(func() error {
+				return ls.scanDists(gctx, ll, s)
+			})
+		}
+
+		for _, s := range rs {
+			g.Go(func() error {
+				return ls.scanRepos(gctx, ll, s)
+			})
+		}
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ls *layerScanner) scanPackages(ctx context.Context, layer *claircore.Layer, s scanner.PackageScanner) error {
+	if err := ls.addToken(ctx); err != nil {
+		return err
+	}
+	defer ls.discardToken()
+
+	v, err := s.Scan(layer)
+	if err != nil {
+		return err
+	}
+	return ls.Store.IndexPackages(ctx, v, layer, s)
+}
+
+func (ls *layerScanner) scanDists(ctx context.Context, layer *claircore.Layer, s scanner.DistributionScanner) error {
+	if err := ls.addToken(ctx); err != nil {
+		return err
+	}
+	defer ls.discardToken()
+
+	v, err := s.Scan(layer)
+	if err != nil {
+		return err
+	}
+	return ls.Store.IndexDistributions(ctx, v, layer, s)
+}
+
+func (ls *layerScanner) scanRepos(ctx context.Context, layer *claircore.Layer, s scanner.RepositoryScanner) error {
+	if err := ls.addToken(ctx); err != nil {
+		return err
+	}
+	defer ls.discardToken()
+
+	v, err := s.Scan(layer)
+	if err != nil {
+		return err
+	}
+	return ls.Store.IndexRepositories(ctx, v, layer, s)
 }

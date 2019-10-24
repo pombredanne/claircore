@@ -11,10 +11,10 @@ import (
 	dlpg "github.com/quay/claircore/pkg/distlock/postgres"
 )
 
-// ScannerFactory is a factory method to return a Scanner interface during libscan runtime.
+// ControllerFactory is a factory method to return a Controller during libscan runtime.
 type ControllerFactory func(lib *libscan, opts *Opts) (*controller.Controller, error)
 
-// scannerFactory is the default ScannerFactory
+// controllerFactory is the default ControllerFactory
 func controllerFactory(lib *libscan, opts *Opts) (*controller.Controller, error) {
 	// add other distributed locking implementations here as they grow
 	var sc distlock.Locker

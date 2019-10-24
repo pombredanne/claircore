@@ -10,7 +10,7 @@ func (ss State) String() string {
 		"Terminal",
 		"CheckManifest",
 		"FetchLayers",
-		"LayerScan",
+		"ScanLayers",
 		"Coalesce",
 		"ScanError",
 		"ScanFinished",
@@ -26,8 +26,8 @@ func (ss *State) FromString(state string) {
 		*ss = CheckManifest
 	case "FetchLayers":
 		*ss = FetchLayers
-	case "LayerScan":
-		*ss = LayerScan
+	case "ScanLayers":
+		*ss = ScanLayers
 	case "Coalesce":
 		*ss = Coalesce
 	case "ScanError":

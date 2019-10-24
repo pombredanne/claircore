@@ -14,13 +14,14 @@ func checkManifest(ctx context.Context, s *Controller) (State, error) {
 		return Terminal, err
 	}
 
-	// if we haven't seen this manifest enter layer scanning state
+	// if we haven't seen this manifest transition to FetchLayers
 	if !ok {
 		s.logger.Info().Str("state", s.getState().String()).Msg("manifest will be scanned")
 		return FetchLayers, nil
 	}
 
 	// we have seen this manifest before and it's been been processed with the desired scanners
+	// retrieve the existing one and transition to Terminal.
 	s.logger.Info().Str("state", s.getState().String()).Msg("manifest already scanned... retreiving")
 	sr, ok, err := s.Store.ScanReport(ctx, s.manifest.Hash)
 	if err != nil {
@@ -31,9 +32,7 @@ func checkManifest(ctx context.Context, s *Controller) (State, error) {
 		s.logger.Error().Str("state", s.getState().String()).Msgf("scanner believes manifest exists but retrieve failed. further investigation is necessary")
 		return Terminal, fmt.Errorf("failed to retrieve manifest: %v", err)
 	}
-	// set scan result to retreived.
 	s.report = sr
 
-	// return nil telling fsm to just return the s.result value to the caller
 	return Terminal, nil
 }
