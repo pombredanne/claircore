@@ -1,138 +1,93 @@
-//+build temp
-
 package layerscanner
 
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/quay/claircore"
 	"github.com/quay/claircore/internal/scanner"
-	"github.com/stretchr/testify/assert"
+	"github.com/quay/claircore/test"
 )
 
-// Test_Deferred_Work confirms our layer scanner will
-// only attempt to fetch the same layer once and calls the
-// store methods the appropriate number of times
-func Test_Deferred_Work(t *testing.T) {
+// Test_Scan_NoError confirms each scanner is called for each layer presented
+// to the layerscanner and no blocking occurs.
+func Test_Scan_NoErrors(t *testing.T) {
+	ctrl := gomock.NewController(t)
 
-	mock := func(t *testing.T, scnrsN int, layersN int) (scanner.Store, scanner.Fetcher, []scanner.PackageScanner) {
-		ctrl := gomock.NewController(t)
-		store := scanner.NewMockStore(ctrl)
-		fetcher := scanner.NewMockFetcher(ctrl)
-		scnrs := []scanner.PackageScanner{}
+	mock_ps := scanner.NewMockPackageScanner(ctrl)
+	mock_ds := scanner.NewMockDistributionScanner(ctrl)
+	mock_rs := scanner.NewMockRepositoryScanner(ctrl)
 
-		for i := 0; i < scnrsN; i++ {
-			scnr := scanner.NewMockPackageScanner(ctrl)
-			scnr.EXPECT().Name().AnyTimes().Return("")
-			scnr.EXPECT().Kind().AnyTimes().Return("")
-			scnr.EXPECT().Version().AnyTimes().Return("")
-			// we should expect Scan to be called the number of layers provided * 2. One time
-			// for the invidiaul layer scan and another for the image layer scan
-			scnr.EXPECT().Scan(gomock.Any()).MaxTimes(layersN * 2)
-			scnrs = append(scnrs, scnr)
-		}
+	mock_store := scanner.NewMockStore(ctrl)
 
-		// these should be scnrsN * layersN  queries or in other words, for each scnr
-		// ask if each layer has been scanned in cases where no work can be deferred (LayerScanned returns false)
-		store.EXPECT().LayerScanned(gomock.Any(), gomock.Any(), gomock.Any()).MaxTimes(layersN*scnrsN).MinTimes(layersN*scnrsN).Return(false, nil)
-		store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).MaxTimes(layersN * scnrsN).MinTimes(layersN * scnrsN).Return(nil)
-
-		// we should only call Fetch to retrive a layer once per layer
-		fetcher.EXPECT().Fetch(gomock.Any(), gomock.Any()).MaxTimes(layersN).MinTimes(layersN).Return(nil)
-
-		return store, fetcher, scnrs
+	layers, err := test.GenUniqueLayersRemote(2, []string{"http://test.com", "http://test.com"})
+	if err != nil {
+		t.Fatalf("failed to create unique layers: %v", err)
 	}
 
-	var tt = []struct {
-		// the name of the test
-		name string
-		// the layers to be scanned
-		layers []*claircore.Layer
-		// the concurrency level of the scanner
-		cLevel int
-		// number of scnr mocks to create
-		scnrs int
-	}{
-		{
-			name:   "one layer, one package scanners",
-			cLevel: 1,
-			layers: []*claircore.Layer{
-				&claircore.Layer{
-					Hash: "test-layer-hash-1",
-				},
-			},
-			scnrs: 1,
+	mock_ps.EXPECT().Scan(layers[0]).Return([]*claircore.Package{}, nil)
+	mock_ps.EXPECT().Scan(layers[1]).Return([]*claircore.Package{}, nil)
+	mock_ps.EXPECT().Kind().AnyTimes()
+	mock_ps.EXPECT().Name().AnyTimes()
+	mock_ps.EXPECT().Version().AnyTimes()
+
+	mock_ds.EXPECT().Scan(layers[0]).Return([]*claircore.Distribution{}, nil)
+	mock_ds.EXPECT().Scan(layers[1]).Return([]*claircore.Distribution{}, nil)
+	mock_ds.EXPECT().Kind().AnyTimes()
+	mock_ds.EXPECT().Name().AnyTimes()
+	mock_ds.EXPECT().Version().AnyTimes()
+
+	mock_rs.EXPECT().Scan(layers[0]).Return([]*claircore.Repository{}, nil)
+	mock_rs.EXPECT().Scan(layers[1]).Return([]*claircore.Repository{}, nil)
+	mock_rs.EXPECT().Kind().AnyTimes()
+	mock_rs.EXPECT().Name().AnyTimes()
+	mock_rs.EXPECT().Version().AnyTimes()
+
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[0].Hash, mock_ps).Return(true, nil)
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[1].Hash, mock_ps).Return(true, nil)
+
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[0].Hash, mock_ds).Return(true, nil)
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[1].Hash, mock_ds).Return(true, nil)
+
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[0].Hash, mock_rs).Return(true, nil)
+	mock_store.EXPECT().LayerScanned(gomock.Any(), layers[1].Hash, mock_rs).Return(true, nil)
+
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[0], mock_ps).Return(nil)
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[1], mock_ps).Return(nil)
+
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[0], mock_rs).Return(nil)
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[1], mock_rs).Return(nil)
+
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[0], mock_ds).Return(nil)
+	mock_store.EXPECT().IndexPackages(gomock.Any(), gomock.Any(), layers[1], mock_ds).Return(nil)
+
+	ecosystem := &scanner.Ecosystem{
+		Name: "test-ecosystem",
+		PackageScanners: func(ctx context.Context) ([]scanner.PackageScanner, error) {
+			return []scanner.PackageScanner{mock_ps}, nil
 		},
-		{
-			name:   "one layer, two package scanners",
-			cLevel: 2,
-			layers: []*claircore.Layer{
-				&claircore.Layer{
-					Hash: "test-layer-hash-1",
-				},
-			},
-			scnrs: 2,
+		DistributionScanners: func(ctx context.Context) ([]scanner.DistributionScanner, error) {
+			return []scanner.DistributionScanner{mock_ds}, nil
 		},
-		{
-			name:   "two layers, two package scanners",
-			cLevel: 2,
-			layers: []*claircore.Layer{
-				&claircore.Layer{
-					Hash: "test-layer-hash-1",
-				},
-				&claircore.Layer{
-					Hash: "test-layer-hash-2",
-				},
-			},
-			scnrs: 2,
-		},
-		{
-			name:   "two layers, four package scanners",
-			cLevel: 2,
-			layers: []*claircore.Layer{
-				&claircore.Layer{
-					Hash: "test-layer-hash-1",
-				},
-				&claircore.Layer{
-					Hash: "test-layer-hash-2",
-				},
-			},
-			scnrs: 4,
-		},
-		{
-			name:   "four layers, four package scanners",
-			cLevel: 2,
-			layers: []*claircore.Layer{
-				&claircore.Layer{
-					Hash: "test-layer-hash-1",
-				},
-				&claircore.Layer{
-					Hash: "test-layer-hash-2",
-				},
-				&claircore.Layer{
-					Hash: "test-layer-hash-3",
-				},
-				&claircore.Layer{
-					Hash: "test-layer-hash-4",
-				},
-			},
-			scnrs: 4,
+		RepositoryScanners: func(ctx context.Context) ([]scanner.RepositoryScanner, error) {
+			return []scanner.RepositoryScanner{mock_rs}, nil
 		},
 	}
 
-	for _, table := range tt {
-		t.Run(table.name, func(t *testing.T) {
-			store, fetcher, scnrs := mock(t, table.scnrs, len(table.layers))
-			ls := New(table.cLevel, &scanner.Opts{
-				Store:   store,
-				Fetcher: fetcher,
-				// PackageScanners: scnrs,
-			})
+	sOpts := &scanner.Opts{
+		Store:      mock_store,
+		Ecosystems: []*scanner.Ecosystem{ecosystem},
+	}
 
-			err := ls.Scan(context.Background(), "test-manifest", table.layers)
-			assert.NoError(t, err)
-		})
+	layerscanner := New(1, sOpts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	err = layerscanner.Scan(ctx, "test-manifest", layers)
+
+	if err != nil {
+		t.Fatalf("failed to scan test layers: %v", err)
 	}
 }
