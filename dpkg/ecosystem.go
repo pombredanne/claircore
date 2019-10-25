@@ -16,6 +16,9 @@ func NewEcosystem(ctx context.Context) *scanner.Ecosystem {
 		DistributionScanners: func(ctx context.Context) ([]scanner.DistributionScanner, error) {
 			return []scanner.DistributionScanner{&osrelease.Scanner{}}, nil
 		},
+		RepositoryScanners: func(ctx context.Context) ([]scanner.RepositoryScanner, error) {
+			return []scanner.RepositoryScanner{}, nil
+		},
 		Coalescer: func(ctx context.Context, store scanner.Store) (scanner.Coalescer, error) {
 			return NewCoalescer(store), nil
 		},

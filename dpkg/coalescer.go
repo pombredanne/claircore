@@ -26,7 +26,6 @@ type Coalescer struct {
 	store scanner.Store
 	ps    scanner.PackageScanner
 	ds    scanner.DistributionScanner
-	rs    scanner.RepositoryScanner
 	sr    *claircore.ScanReport
 }
 
@@ -36,7 +35,6 @@ func NewCoalescer(store scanner.Store) *Coalescer {
 		store: store,
 		ps:    &Scanner{},
 		ds:    &osrelease.Scanner{},
-		rs:    nil,
 		sr: &claircore.ScanReport{
 			// we will only fill these fields
 			PackageIntroduced:     map[int]string{},
@@ -71,10 +69,6 @@ func (c *Coalescer) Coalesce(ctx context.Context, layers []*claircore.Layer) (*c
 			return nil, err
 		}
 
-		a.repos, err = c.store.RepositoriesByLayer(ctx, layer.Hash, scanner.VersionedScanners{c.rs})
-		if err != nil {
-			return nil, err
-		}
 		artifacts = append(artifacts, a)
 	}
 	c.associate(ctx, artifacts)
@@ -129,7 +123,7 @@ func (c *Coalescer) prune(ctx context.Context, artifacts []layerArtifacts) {
 		return
 	}
 
-	seenDB := map[string]struct{}{}
+	// seenDB := map[string]struct{}{}
 	keep := map[string]map[int]struct{}{}
 
 	// walk layer artifacts backwards searching for newest package databases
@@ -146,15 +140,18 @@ func (c *Coalescer) prune(ctx context.Context, artifacts []layerArtifacts) {
 		}
 
 		// for each package db discovered check if we've seen it. if we haven't
-		// seen it record packages in the keep map and add to seenDB
+		// seen it record all packages in this package db
 		for db, packages := range packageDBs {
-			if _, ok := seenDB[db]; !ok {
+			if _, ok := keep[db]; !ok {
+				keep[db] = map[int]struct{}{}
 				for _, pkg := range packages {
 					keep[db][pkg.ID] = struct{}{}
 				}
-				seenDB[db] = struct{}{}
 			}
 		}
+
+		// break out of search loop
+		break
 	}
 
 	// prune any packages not in the keep map

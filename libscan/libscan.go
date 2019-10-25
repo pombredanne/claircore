@@ -7,6 +7,7 @@ import (
 
 	"github.com/quay/claircore"
 	"github.com/quay/claircore/internal/scanner"
+	"github.com/quay/claircore/internal/scanner/controller"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog"
@@ -92,7 +93,7 @@ func (l *libscan) Scan(ctx context.Context, manifest *claircore.Manifest) (<-cha
 }
 
 // scan performs the business logic of starting a scan.
-func (l *libscan) scan(ctx context.Context, s scanner.Scanner, rc chan *claircore.ScanReport, m *claircore.Manifest) {
+func (l *libscan) scan(ctx context.Context, s *controller.Controller, rc chan *claircore.ScanReport, m *claircore.Manifest) {
 	// once scan is finished close the rc channel incase callers are ranging
 	defer close(rc)
 

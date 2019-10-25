@@ -24,7 +24,7 @@ const (
 const (
 	DefaultScanLockRetry        = 5 * time.Second
 	DefaultLayerScanConcurrency = 10
-	DefaultLayerFetchOpt        = scanner.Tee
+	DefaultLayerFetchOpt        = scanner.OnDisk
 )
 
 // Opts are depedencies and options for constructing an instance of libscan
@@ -45,7 +45,7 @@ type Opts struct {
 	// if nil the default factory will be used. useful for testing purposes
 	ControllerFactory ControllerFactory
 	// a list of ecosystems to use which define which package databases and coalescing methods we use
-	Ecosystems []scanner.Ecosystem
+	Ecosystems []*scanner.Ecosystem
 	// a convenience method for holding a list of versioned scanners
 	vscnrs scanner.VersionedScanners
 }

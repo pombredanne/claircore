@@ -59,9 +59,9 @@ func (ls *layerScanner) discardToken() {
 // On completion a token is discarded unblocking other routines which are waiting.
 //
 // On ctx cancel or a go routine reporting an scan/index error all routines blocking on adding a token will error
-// and the will not discard a token.
+// and the will not subsequently try to discard a token.
 //
-// Scan waits for all go routines to finish successfully before unblocking.
+// Scan waits for all go routines to finish successfully before unblocking or returns with the first error if encountered
 func (ls *layerScanner) Scan(ctx context.Context, manifest string, layers []*claircore.Layer) error {
 	// compute concurrency level
 	x := float64(len(layers))
@@ -83,20 +83,23 @@ func (ls *layerScanner) Scan(ctx context.Context, manifest string, layers []*cla
 		ll := layer
 
 		for _, s := range ps {
+			ss := s
 			g.Go(func() error {
-				return ls.scanPackages(gctx, ll, s)
+				return ls.scanPackages(gctx, ll, ss)
 			})
 		}
 
 		for _, s := range ds {
+			ss := s
 			g.Go(func() error {
-				return ls.scanDists(gctx, ll, s)
+				return ls.scanDists(gctx, ll, ss)
 			})
 		}
 
 		for _, s := range rs {
+			ss := s
 			g.Go(func() error {
-				return ls.scanRepos(gctx, ll, s)
+				return ls.scanRepos(gctx, ll, ss)
 			})
 		}
 	}
@@ -114,6 +117,14 @@ func (ls *layerScanner) scanPackages(ctx context.Context, layer *claircore.Layer
 	}
 	defer ls.discardToken()
 
+	ok, err := ls.Store.LayerScanned(ctx, layer.Hash, s)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+
 	v, err := s.Scan(layer)
 	if err != nil {
 		return err
@@ -127,6 +138,14 @@ func (ls *layerScanner) scanDists(ctx context.Context, layer *claircore.Layer, s
 	}
 	defer ls.discardToken()
 
+	ok, err := ls.Store.LayerScanned(ctx, layer.Hash, s)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+
 	v, err := s.Scan(layer)
 	if err != nil {
 		return err
@@ -139,6 +158,14 @@ func (ls *layerScanner) scanRepos(ctx context.Context, layer *claircore.Layer, s
 		return err
 	}
 	defer ls.discardToken()
+
+	ok, err := ls.Store.LayerScanned(ctx, layer.Hash, s)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
 
 	v, err := s.Scan(layer)
 	if err != nil {

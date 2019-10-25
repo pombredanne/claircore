@@ -10,13 +10,18 @@ import (
 // reduce determines which layers should be fetched/scanned and returns these layers
 func reduce(ctx context.Context, store scanner.Store, scnrs scanner.VersionedScanners, layers []*claircore.Layer) ([]*claircore.Layer, error) {
 	do := []*claircore.Layer{}
+	seen := map[string]struct{}{}
 	for _, scnr := range scnrs {
 		for _, l := range layers {
-			if ok, err := store.LayerScanned(ctx, l.Hash, scnr); ok {
-				if err != nil {
-					return nil, err
+			ok, err := store.LayerScanned(ctx, l.Hash, scnr)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				if _, ok := seen[l.Hash]; !ok {
+					do = append(do, l)
+					seen[l.Hash] = struct{}{}
 				}
-				do = append(do, l)
 			}
 		}
 	}

@@ -8,6 +8,6 @@ type Opts struct {
 	ScanLock     distlock.Locker
 	LayerScanner LayerScanner
 	Fetcher      Fetcher
-	Ecosystems   []Ecosystem
+	Ecosystems   []*Ecosystem
 	Vscnrs       VersionedScanners
 }

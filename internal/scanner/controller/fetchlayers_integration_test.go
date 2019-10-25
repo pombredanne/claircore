@@ -1,5 +1,3 @@
-//+build unix
-
 package controller
 
 import (
@@ -9,12 +7,12 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/quay/claircore"
 	"github.com/quay/claircore/internal/scanner"
-	"github.com/quay/claircore/internal/scanner/defaultfetcher"
+	"github.com/quay/claircore/internal/scanner/fetcher"
 	"github.com/quay/claircore/test"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_FetchAndStackLayers(t *testing.T) {
+func Test_FetchLayers(t *testing.T) {
 	// whether we delete the temporary directory where the layer was unpacked
 	var PurgeTmpDirs = false
 	var tt = []struct {
@@ -45,7 +43,7 @@ func Test_FetchAndStackLayers(t *testing.T) {
 		t.Run(table.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			store := scanner.NewMockStore(ctrl)
-			store.EXPECT().SetScanReport(gomock.Any()).Return(nil)
+			store.EXPECT().SetScanReport(context.Background(), gomock.Any()).Return(nil)
 
 			// generate test manifest
 			layers, err := test.GenUniqueLayersRemote(table.layers, table.uris)
@@ -57,7 +55,7 @@ func Test_FetchAndStackLayers(t *testing.T) {
 			// generate scanner
 			opts := &scanner.Opts{
 				Store:   store,
-				Fetcher: defaultfetcher.New(nil, nil, scanner.Tee),
+				Fetcher: fetcher.New(nil, nil, scanner.Tee),
 			}
 			if PurgeTmpDirs {
 				opts.Fetcher.Purge()
@@ -66,7 +64,7 @@ func Test_FetchAndStackLayers(t *testing.T) {
 			s := New(opts)
 			s.manifest = m
 
-			_, err = fetchAndStackLayers(s, context.Background())
+			_, err = fetchLayers(context.Background(), s)
 			assert.NoError(t, err)
 		})
 	}

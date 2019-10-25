@@ -23,9 +23,9 @@ const (
 	Terminal State = iota
 	// CheckManifest determines if the manifest should be scanned.
 	// if no Terminal is returned and we return the existing ScanReport.
-	// Transitions: FetchAndStackLayers, Terminal
+	// Transitions: FetchLayers, Terminal
 	CheckManifest
-	// FetchAndStackLayers retrieves all the layers in a manifest and stacks them the same obtain the file image contents.
+	// FetchLayers retrieves all the layers in a manifest and stacks them the same obtain the file image contents.
 	// creates the "image" layer
 	// Transitions: LayerScan
 	FetchLayers
@@ -84,8 +84,12 @@ type Controller struct {
 func New(opts *scanner.Opts) *Controller {
 	// fully init any maps and arrays
 	scanRes := &claircore.ScanReport{
-		PackageIntroduced: map[int]string{},
-		Packages:          map[int]*claircore.Package{},
+		PackageIntroduced:     map[int]string{},
+		Packages:              map[int]*claircore.Package{},
+		Distributions:         map[int]*claircore.Distribution{},
+		Repositories:          map[int]*claircore.Repository{},
+		DistributionByPackage: map[int]int{},
+		RepositoryByPackage:   map[int]int{},
 	}
 
 	s := &Controller{
@@ -151,7 +155,7 @@ func (s *Controller) handleError(ctx context.Context, err error) {
 	s.report.Success = false
 	s.report.Err = err.Error()
 	s.report.State = ScanError.String()
-	log.Printf("error before set: %v %v", err.Error(), s.report.Err)
+	s.logger.Err(err).Msgf("countered error during scan: %v", err)
 	err = s.Store.SetScanReport(ctx, s.report)
 	if err != nil {
 		// just log, we are about to bail anyway

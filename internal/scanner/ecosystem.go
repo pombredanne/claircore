@@ -17,7 +17,7 @@ type Ecosystem struct {
 }
 
 // EcosystemsToScanners extracts and dedupes multiple ecosystems and returns their descrete scanners
-func EcosystemsToScanners(ctx context.Context, ecosystems []Ecosystem) ([]PackageScanner, []DistributionScanner, []RepositoryScanner, error) {
+func EcosystemsToScanners(ctx context.Context, ecosystems []*Ecosystem) ([]PackageScanner, []DistributionScanner, []RepositoryScanner, error) {
 	ps := []PackageScanner{}
 	ds := []DistributionScanner{}
 	rs := []RepositoryScanner{}
