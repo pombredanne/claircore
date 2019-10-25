@@ -52,7 +52,7 @@ func Test_LayerScanned_False(t *testing.T) {
 			defer teardown()
 
 			// create scanners
-			scnrs := test.GenUniqueScanners(table.scnrs)
+			scnrs := test.GenUniquePackageScanners(table.scnrs)
 			err := pgtest.InsertUniqueScanners(db, scnrs)
 			if err != nil {
 				t.Fatalf("failed to insert unique scanners: %v", err)
@@ -115,7 +115,7 @@ func Test_LayerScanned_True(t *testing.T) {
 			defer teardown()
 
 			// create scanners
-			scnrs := test.GenUniqueScanners(table.scnrs)
+			scnrs := test.GenUniquePackageScanners(table.scnrs)
 			err := pgtest.InsertUniqueScanners(db, scnrs)
 			if err != nil {
 				t.Fatalf("failed to insert unique scanners: %v", err)
