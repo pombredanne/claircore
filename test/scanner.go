@@ -24,7 +24,7 @@ func GenUniquePackageScanners(n int) scanner.VersionedScanners {
 func GenUniqueDistributionScanners(n int) scanner.VersionedScanners {
 	var vscnrs = []scanner.VersionedScanner{}
 	for i := 0; i < n; i++ {
-		name, version, kind := fmt.Sprintf("test-scanner-%d", i), fmt.Sprintf("version-%d", i), fmt.Sprint("distribution", i)
+		name, version, kind := fmt.Sprintf("test-scanner-%d", i), fmt.Sprintf("version-%d", i), fmt.Sprint("distribution")
 		m := scanner.NewPackageScannerMock(name, version, kind)
 		vscnrs = append(vscnrs, scanner.VersionedScanner(m))
 	}
@@ -37,7 +37,7 @@ func GenUniqueDistributionScanners(n int) scanner.VersionedScanners {
 func GenUniqueRepositoryScanners(n int) scanner.VersionedScanners {
 	var vscnrs = []scanner.VersionedScanner{}
 	for i := 0; i < n; i++ {
-		name, version, kind := fmt.Sprintf("test-scanner-%d", i), fmt.Sprintf("version-%d", i), fmt.Sprint("repository", i)
+		name, version, kind := fmt.Sprintf("test-scanner-%d", i), fmt.Sprintf("version-%d", i), fmt.Sprint("repository")
 		m := scanner.NewPackageScannerMock(name, version, kind)
 		vscnrs = append(vscnrs, scanner.VersionedScanner(m))
 	}
