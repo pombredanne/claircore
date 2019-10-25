@@ -50,7 +50,7 @@ func coalesce(ctx context.Context, s *Controller) (State, error) {
 // MergeSR merges ScanReports.
 //
 // source is the ScanReport that the scanner is working on.
-// merge is a variadic argument taking all ScanReports returned from coalescers
+// merge is an array ScanReports returned from coalescers
 func MergeSR(source *claircore.ScanReport, merge []*claircore.ScanReport) *claircore.ScanReport {
 	for _, sr := range merge {
 		for k, v := range sr.Packages {
